@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:context="http://www.springframework.org/schema/context"
+    xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-2.5.xsd
+    http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-2.5.xsd">
+
+    <bean id="graphBundle" class="org.opentripplanner.model.GraphBundle">
+        <property name="path" value="/otp" />
+    </bean>
+
+
+    <bean id="gtfsBuilder" class="org.opentripplanner.graph_builder.impl.GtfsGraphBuilderImpl">
+        <property name="gtfsBundles">
+            <bean id="gtfsBundles" class="org.opentripplanner.graph_builder.model.GtfsBundles">
+                <property name="bundles">
+                    <list>
+                        <bean class="org.opentripplanner.graph_builder.model.GtfsBundle">
+                            <!-- DANCHOI original <property name="url" value="http://developer1.trimet.org/schedule/gtfs.zip" /> -->
+                            <property name="url" value="http://www.mbta.com/uploadedfiles/MBTA_GTFS.zip" />
+                            <!--
+                                  commented out by DANCHOI
+                                 <property name="defaultAgencyId" value="TriMet" />
+                                 -->
+
+                            <!-- By default, bikes may only be taken along on transit trips if the GTFS data allows them to be.
+                                 If the GTFS data doesn't contain appropriate data, but the actual transit trips do allows bikes
+                                 to be taken along, a defaultBikesAllowed property may be specified to allow bikes.
+                             -->
+                            <property name="defaultBikesAllowed" value="true" />
+                        </bean>
+                    </list>
+                </property>
+            </bean>
+        </property>
+    </bean>
+
+
+    <bean id="nedBuilder" class="org.opentripplanner.graph_builder.impl.ned.NEDGraphBuilderImpl">
+        <property name="gridCoverageFactory">
+                <bean class="org.opentripplanner.graph_builder.impl.ned.NEDGridCoverageFactoryImpl">
+                    <property name="cacheDirectory" value="/otp/cache/ned" />
+                </bean>
+        </property>
+    </bean>
+
+
+    <bean id="osmBuilder" class="org.opentripplanner.graph_builder.impl.osm.OpenStreetMapGraphBuilderImpl">
+        
+        <!-- Use an OSM provider that reads street data from an .osm file -->
+        <!-- DANCHOI
+        <property name="provider">
+            <bean class="org.opentripplanner.openstreetmap.impl.AnyFileBasedOpenStreetMapProviderImpl">
+                <property name="path" value="/otp/cache/osm/or-wa.osm" />
+            </bean>
+        </property>
+        -->
+
+
+        <!-- NOTE: the tutorial uses a single OSM document for the streets of Portland, Oregon.  
+             To use OSM streets data for a GTFS feed that's outside of the Portland area, uncomment the following 
+             section below (and comment the provider section above that uses the file /otp/cache/osm/or-wa.osm).
+             http://jxapi.openstreetmap.org/xapi/api/0.6/
+             http://open.mapquestapi.com/xapi/api/0.6/
+
+             Xapi courtesy of MapQuest http://www.mapquest.com
+        -->
+        <!-- Use an OSM provider that will download OSM data based on the stops locations (extent of agency) in the GTFS data -->
+
+        <property name="provider">
+            <bean class="org.opentripplanner.openstreetmap.impl.RegionBasedOpenStreetMapProviderImpl">
+                <property name="regionsSource">
+                    <bean class="org.opentripplanner.graph_builder.impl.TransitStopsRegionsSourceImpl" />
+                </property>
+                <property name="cacheDirectory" value="/otp/cache/osm" />
+                <property name="apiBaseUrl"     value="http://open.mapquestapi.com/xapi/api/0.6/" />
+            </bean>
+        </property>
+
+
+
+        <!-- Street Traversal Permisssion and Biking weighting is configurable, but we'll use the defaults for OSM...
+ 
+             Street Traversal Permisssion: what modes are allowed on certain road/surface types (e.g., no cars on bike lanes, etc...)
+
+             Bike weighting: the planner is using a 'shortest path' algorithm to choose one route from another.  To prefer certain paths
+                             for biking (e.g., bike lanes), we can make the theoretical lenght of a street type shorter or longer, thus 
+                             more or less attractive to the routing engine.  Weights of > 1.0 make a road type shorter (more attactive)
+
+             @see http://wiki.openstreetmap.org/wiki/OSM_tags_for_routing/Access-Restrictions 
+             @see https://github.com/openplans/OpenTripPlanner/blob/master/opentripplanner-graph-builder/src/main/java/org/opentripplanner/graph_builder/impl/osm/DefaultWayPropertySetSource.java
+        -->
+        <property name="defaultWayPropertySetSource">
+            <bean class="org.opentripplanner.graph_builder.impl.osm.DefaultWayPropertySetSource" />
+        </property>
+    </bean>
+
+
+    <bean id="transitStreetLink" class="org.opentripplanner.graph_builder.impl.TransitToStreetNetworkGraphBuilderImpl" />
+    <bean id="optimizeTransit" class="org.opentripplanner.graph_builder.impl.OptimizeTransitGraphBuilderImpl" />
+    <bean id="checkGeometry" class="org.opentripplanner.graph_builder.impl.CheckGeometryGraphBuilderImpl" />
+
+    <bean id="graphBuilderTask" class="org.opentripplanner.graph_builder.GraphBuilderTask">
+        <!-- contraction hierarchies -->
+<!-- commented out
+        <property name="modes">
+          <list>
+            <bean class="org.opentripplanner.routing.core.TraverseOptions">
+              <property name="mode" value="BICYCLE" />
+              <property name="optimize" value="QUICK" />
+            </bean>
+            <bean class="org.opentripplanner.routing.core.TraverseOptions">
+              <property name="mode" value="BICYCLE" />
+              <property name="optimize" value="SAFE" />
+            </bean>
+            <bean class="org.opentripplanner.routing.core.TraverseOptions">
+              <property name="mode" value="WALK" />
+              <property name="optimize" value="QUICK" />
+            </bean>
+          </list>
+        </property>
+        <property name="contractionFactor" value="0.992" />
+-->
+
+        <!-- typical config -->
+        <property name="graphBundle" ref="graphBundle" />
+        <property name="graphBuilders">
+            <list>
+                <ref bean="gtfsBuilder" />
+                <ref bean="osmBuilder" />
+                <ref bean="transitStreetLink" />
+<!-- commented out
+                <ref bean="nedBuilder" />
+-->
+                <ref bean="optimizeTransit" />
+                <ref bean="checkGeometry" />
+            </list>
+        </property>
+    </bean>
+</beans>
